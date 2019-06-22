@@ -57,7 +57,14 @@ exports.create = async function(args) {
     }
 
     try {
-        const user = new User(args);
+        const newUser = {
+            ...args
+        };
+
+        delete newUser.password;
+
+        const user = new User(newUser);
+        await user.setPassword(args['password']);
         return user.save();
     } catch (error) {
         throw error;
@@ -82,3 +89,40 @@ exports.delete = async function(id) {
         throw new Error('Could not save user');
     }
 }
+
+exports.list = async function(_deleted, _limit, _page) {
+    const limit = _limit ? _limit : 10;
+    const page = _page && _page > 0 ? _page - 1 : 0;
+    const opts = {
+        deleted: _deleted ? _deleted : false,
+        ...paginate(_limit, _page)
+    }
+    let result, _count = 0;
+    try {
+        const query = await User.find(opts);
+        
+        result = query;
+        _count = result ? result.length : 0 
+    } catch (error) {
+        
+    }
+
+    return {
+        docs: result ? result : [],
+        total: _count,
+        page: page + 1,
+        perPage: limit,
+        pages: Math.ceil(_count / limit)
+    }
+}
+
+function paginate(_limit, _page) {
+    const limit = _limit ? _limit : 10;
+    const page = _page && _page > 0 ? _page - 1 : 0;
+
+    return {
+        limit: limit,
+        skip: limit * page
+    }
+}
+

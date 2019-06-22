@@ -14,9 +14,11 @@ const sandbox = sinon.createSandbox();
 
 describe('Users', () => {
 
-    let findStub, sampleArgs, sampleUser;
+    let findStub, sampleArgs, sampleUser, listStub;
 
     beforeEach(() => {
+        mongoose.models = {};
+        mongoose.modelSchemas = {};
         sampleUser = {
             id: '123',
             username: 'abcd',
@@ -25,6 +27,7 @@ describe('Users', () => {
             save: sandbox.stub().resolves()
         }
         findStub = sandbox.stub(mongoose.Model, 'findById').resolves(sampleUser);
+        listStub = sandbox.stub(mongoose.Model, 'find').resolves([sampleUser]);
     })
 
     afterEach(() => {
@@ -67,6 +70,7 @@ describe('Users', () => {
 
         beforeEach(async () => {
             saveStub = sandbox.stub().resolves(sampleUser);
+            setPasswordStub = sandbox.stub().resolves();
             
             sampleUser = {
                 ...sampleUser,
@@ -76,7 +80,7 @@ describe('Users', () => {
             delete sampleUser.id;
             delete sampleUser.save;
 
-            FakeUserClass = sandbox.stub().returns({save: saveStub});
+            FakeUserClass = sandbox.stub().returns({save: saveStub, setPassword: setPasswordStub});
 
             users.__set__('User', FakeUserClass);
             result = await users.create(sampleUser);
@@ -126,11 +130,16 @@ describe('Users', () => {
 
         it ('should call user with new keyword', async () => {
             await expect(FakeUserClass).to.have.been.calledWithNew;
-            await expect(FakeUserClass).to.have.been.calledWith(sampleUser);
+            const newUser = {
+                ...sampleUser
+            }
+            delete newUser.password;
+            await expect(FakeUserClass).to.have.been.calledWith(newUser);
         })
 
         it ('should save the user', async () => {
             await expect(saveStub).to.have.been.called;
+            await expect(setPasswordStub).to.have.been.called;
             await expect(result.email).to.eq(sampleUser.email);
         })
 
@@ -162,6 +171,29 @@ describe('Users', () => {
         it ('should catch errors on save', async () => {
             sampleUser.save.throws('Could not save user');
             await expect(users.delete(123)).to.eventually.be.rejectedWith('Could not save user');
+        })
+    })
+
+    context('List Users', () => {
+        it('should return list of users', async () => {
+            const result = await users.list();
+            expect(listStub).to.be.calledOnce;
+            expect(listStub).to.be.calledWith({deleted: false, limit: 10, skip: 0});
+            expect(result.total).to.eq(1);
+            expect(result.page).to.eq(1);
+            expect(result.perPage).to.eq(10);
+            expect(result.pages).to.eq(1);
+        })
+        it('should find deleted users', async () => {
+            await users.list(true);
+            expect(listStub).to.be.calledOnce;
+            expect(listStub).to.be.calledWith({deleted: true, limit: 10, skip: 0});
+        })
+
+        it('should call find with correct limit and skip params', async () => {
+            await users.list(false, 10, 2);
+            expect(listStub).to.be.calledOnce;
+            expect(listStub).to.be.calledWith({deleted: false, limit: 10, skip: 10});
         })
     })
 

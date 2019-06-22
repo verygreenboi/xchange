@@ -3,6 +3,7 @@ const uniqueValidator = require('mongoose-unique-validator');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const secret = process.env.JWT_SECRET || 'abcd';
+const mongoosePaginate = require('mongoose-paginate-v2');
 
 const schema = new mongoose.Schema({
     email: {type: String, lowercase: true, unique: true, required: [true, "can't be blank"], match: [/\S+@\S+\.\S+/, 'is invalid'], index: true},
@@ -13,6 +14,7 @@ const schema = new mongoose.Schema({
 }, {timestamps: true});
 
 schema.plugin(uniqueValidator, {message: 'is already taken.'});
+schema.plugin(mongoosePaginate);
 
 schema.methods.setPassword = function(password) {
     this.salt = crypto.randomBytes(16).toString('hex');
